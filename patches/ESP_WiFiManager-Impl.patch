@@ -1,0 +1,8 @@
+510c510
+<   int connRes = WiFi.waitForConnectResult();
+---
+>   int connRes = WiFi.waitForConnectResult(10000);
+575c575
+<         WiFi.mode(WIFI_AP); // Dual mode becomes flaky if not connected to a WiFi network.
+---
+>         WiFi.mode(WIFI_MODE_NULL); // Dual mode becomes flaky if not connected to a WiFi network.

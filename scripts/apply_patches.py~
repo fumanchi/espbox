@@ -1,0 +1,33 @@
+from os import path
+from os.path import join, isfile
+
+Import("env")
+
+
+pathPatches = path.join(env["PROJECT_DIR"], "patches")
+# print(">>>>>>>>>>>>>> pathPatches=", pathPatches, flush=True)
+pathPatchFile = path.join(pathPatches, "ESP_WiFiManager-Impl.patch")
+# print(">>>>>>>>>>>>>> pathPatchFile=", pathPatchFile, flush=True)
+
+pathESPWifiManagerFolder = path.join(env["PROJECT_LIBDEPS_DIR"], env["PIOENV"], "ESP_WifiManager")
+# print(">>>>>>>>>>>>>> pathESPWifiManagerFolder=", pathESPWifiManagerFolder, flush=True)
+pathESPWifiManagerPatchflagFile = path.join(pathESPWifiManagerFolder, ".patching-done")
+# print(">>>>>>>>>>>>>> pathESPWifiManagerPatchflagFile=", pathESPWifiManagerPatchflagFile, flush=True)
+pathESPWifiManagerSrcFolder = path.join(pathESPWifiManagerFolder, "src")
+# print(">>>>>>>>>>>>>> pathESPWifiManagerSrcFolder=", pathESPWifiManagerSrcFolder, flush=True)
+pathpathESPWifiManagerSrcFile = path.join(pathESPWifiManagerSrcFolder, "ESP_WiFiManager-Impl.h")
+# print(">>>>>>>>>>>>>> pathpathESPWifiManagerSrcFile=", pathpathESPWifiManagerSrcFile, flush=True)
+
+
+# patch file only if we didn't do it before
+if not isfile(pathESPWifiManagerPatchflagFile):
+    assert isfile(pathpathESPWifiManagerSrcFile)
+    assert isfile(pathPatchFile)
+
+    env.Execute("patch %s %s" % (pathpathESPWifiManagerSrcFile, pathPatchFile))
+
+    def _touch(path):
+        with open(path, "w") as fp:
+            fp.write("")
+
+    env.Execute(lambda *args, **kwargs: _touch(pathESPWifiManagerPatchflagFile))

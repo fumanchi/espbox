@@ -1,0 +1,20 @@
+{
+    "BUTTON_PIN": "33",
+
+    "ROTARY_PIN1": "39",
+    "ROTARY_PIN2": "34",
+    "ROTARY_CLICKS_PER_STEP": "4",
+
+    "MRFC522_SS": "5",
+    "MRFC522_RST": "0",
+    "MFRC522_SPI_FREQUENCY": "4000000",
+
+    "DFMP3_TX": "10",
+    "DFMP3_RX": "9",
+    "DFMP3_BUSY": "27",
+
+    "MQTT_HOST": "",
+    "MQTT_PORT": "",
+    "MQTT_USER": "",
+    "MQTT_PASS": ""
+  }

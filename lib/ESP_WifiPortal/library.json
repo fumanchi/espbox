@@ -1,0 +1,51 @@
+{
+  "name": "ESP_WifiPortal",
+  "version": "0.1.0",
+  "keywords": "wifi, wi-fi, MultiWiFi, multi-wifi, WiFiPortal, WiFiManager, esp32, esp32-s2, esp32-s3, esp32-c3, Communication, iot, credentials, persistent, config-portal, DoubleReset, MultiReset, DoubleResetDetector, littlefs, spiffs, eeprom, dns-server",
+  "description": "Library to integrate ESP_WifiManager into your sketch",
+  "authors":
+  {
+    "name":  "Bernd Roemer",
+    "url":   "https://github.com/fumanchi",
+    "maintainer": true
+  },
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/fumanchi/ESP_WiFiPortal"
+  },
+  "homepage": "https://github.com/fumanchi/ESP_WiFiPortal",
+  "export": {
+    "exclude": [
+      "linux",
+      "extras",
+      "tests"
+    ]
+  },
+  "dependencies": 
+  [
+    {
+      "owner": "khoih-prog",
+      "name": "ESP_WifiManager",
+      "version": ">=1.12.1",
+      "platforms": ["espressif8266", "espressif32"]
+    },
+    {
+      "owner": "bblanchon",
+      "name": "ArduinoJson",
+      "version": ">=6.21.3",
+      "platforms": ["espressif8266", "espressif32"]
+    },
+    {
+      "owner": "khoih-prog",
+      "name": "ESP_DoubleResetDetector",
+      "version": ">=1.3.2",
+      "platforms": ["espressif8266", "espressif32"]
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": ["espressif8266", "espressif32"],
+  "examples": "examples/*/*/*.ino",
+  "headers": ["ESP_WiFiPortal.hpp"]
+}
