@@ -44,6 +44,7 @@
 #include "rfc/RFId.hpp"
 
 #include "mp3/Mp3Player.hpp"
+#include "mp3/Mp3Player_ControlEntry.hpp"
 #include "mp3/Mp3Player_VolumeControl.hpp"
 #include "mp3/Mp3Player_EqualizerControl.hpp"
 #include "mp3/Mp3Player_FolderSelection.hpp"
@@ -115,9 +116,10 @@ public:
         };
   };
 
+
   MainMenu(TFT &tft)
     : Menu  {tft, RotaryEncoder::Instance(), "Main", {
-        
+        new Mp3Player::ControlEntry {this, &Mp3Player::Instance()},
         new Menu::SubMenu{0x00A2, "Ton", 
           {
             new Menu::Leaf{0x00D6, "Lautstärke", [](Menu *menu, Menu::Entry*) { Serial.println(__PRETTY_FUNCTION__); Mp3Player::VolumeControl::Spawn(menu, "volume", &Mp3Player::Instance(), 20 /* settings.maxVolume */); }},

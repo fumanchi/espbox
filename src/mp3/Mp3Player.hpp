@@ -77,16 +77,24 @@ public: /* types */
       bool hasTrack() const;
       uint16_t getTrack() const;
 
+      bool isPlaying() const;
+      bool startPlaying();
+      bool stopPlaying();
+
     protected:
       uint16_t folder;
       uint16_t track;
       uint8_t flags;    
+
+      bool playing;
   };
 
 public:
   using DfMp3 = DFMiniMp3<HardwareSerial, Mp3Player>; //, Mp3ChipIncongruousNoAck>;
   using PlaySources = DfMp3_PlaySources;
  
+  class ControlEntry;
+
   class VolumeControl;
   class EqualizerControl;
   
@@ -114,6 +122,8 @@ public:
   using DfMp3::getFolderTrackCount;
   uint16_t getFolderTrackCount();
 
+  const State &getCurrentState() const;
+
   uint8_t getVolume() const;
   uint8_t setVolume(uint8_t currentVolume); // returns actual current volume
   
@@ -122,6 +132,10 @@ public:
 
   bool waitUntilIdle(size_t millis = 500);
   bool waitUntilBusy(size_t millis = 500);
+
+  void start();
+  void stop();
+  void pause();
 
   void runState(const State &state);
 
@@ -168,5 +182,10 @@ protected:
   uint16_t currentTrackIndex;
   uint16_t randomSeed;
 };
+
+inline const Mp3Player::State &Mp3Player::getCurrentState() const
+{
+  return this->currentState;
+}
 
 #endif /* MP3PLAYER_HPP_ */

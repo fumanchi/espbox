@@ -54,8 +54,8 @@ bool Menu::SmartMenuIO::release()
   return retval;
 }
 
-Menu::Entry::Entry(Type type, uint16_t glyph, std::string label, callback_t callback)
-  : parent {nullptr},
+Menu::EntryImpl::EntryImpl(Type type, uint16_t glyph, std::string label, callback_t callback, SubMenu *parent)
+  : parent {parent},
 
     type {type},
     glyph {glyph},
@@ -65,8 +65,8 @@ Menu::Entry::Entry(Type type, uint16_t glyph, std::string label, callback_t call
   
 }
 
-Menu::Leaf::Leaf(uint16_t glyph, std::string label, callback_t callback)
-  : Entry {Type::Leaf, glyph, std::move(label), callback}
+Menu::Leaf::Leaf(uint16_t glyph, std::string label, callback_t callback, SubMenu *parent)
+  : EntryImpl {Type::Leaf, glyph, std::move(label), callback, parent}
 {
       
 }
@@ -112,8 +112,8 @@ void Menu::Toggle::setState(bool state)
   if (state != this->state)
   {
     this->state = state;
-    this->Entry::glyph = this->stateEntries[(int)this->state].first;
-    this->Entry::label = this->stateEntries[(int)this->state].second;
+    this->EntryImpl::glyph = this->stateEntries[(int)this->state].first;
+    this->EntryImpl::label = this->stateEntries[(int)this->state].second;
   }
 }
 
@@ -129,7 +129,7 @@ Menu::Value::Value(std::string label, callback_t callback)
 }
 
 Menu::Value::Value(uint16_t glyph, std::string label, callback_t callback)
-  : Entry {Type::Value, glyph, std::move(label), callback}
+  : EntryImpl {Type::Value, glyph, std::move(label), callback}
 {
     
 }
@@ -194,14 +194,14 @@ void Menu::StringValue::setValue(Menu *menu, Value *value, const char *data)
 
 
 Menu::SubMenu::SubMenu(uint16_t glyph, std::string label, std::initializer_list<Entry*> entries, int8_t index, Direction direction, ExitCallback exitCallback)
-  : Entry {Type::SubMenu, glyph, std::move(label), [](Menu *menu, Menu::Entry *entry) {menu->setCurrent(static_cast<SubMenu*>(entry));}},
+  : EntryImpl {Type::SubMenu, glyph, std::move(label), [](Menu *menu, Menu::Entry *entry) {menu->setCurrent(static_cast<SubMenu*>(entry));}},
     entries {entries.begin(), entries.end()},
     index {index},
     direction {direction},
     exitCallback {exitCallback}
 {
   for (Entry *entry : this->entries)
-    entry->parent = this;
+    entry->setParent(this);
 }
 
 bool Menu::SubMenu::isSubMenu() { return true; }
@@ -341,7 +341,7 @@ void Menu::selected()
 {
   if (Entry *entry = this->current ? this->current->entries[this->index] : nullptr)
   {
-    if (entry->type == Entry::Type::Value)
+    if (entry->getType() == Entry::Type::Value)
     {
       StringValue *stringValue = static_cast<StringValue*>(entry);
       if (stringValue && stringValue->editCallback)
@@ -350,17 +350,18 @@ void Menu::selected()
         return;
       }
     }
-    if (entry->callback)
-      entry->callback(this, entry);
+    entry->call(this);
+    // if (entry->hasCallback())
+    //   entry->getCallback()(this, entry);
   }
 }
 
 void Menu::back()
 {
-  if (this->current->type == Entry::Type::SubMenu)
+  if (this->current->getType() == Entry::Type::SubMenu)
   {
     SubMenu *last = this->current;
-    if (SubMenu *sub = this->current->parent)
+    if (SubMenu *sub = this->current->getParent())
     {
       uint8_t index = 0;
       for (; index < sub->entries.size(); ++index)
@@ -378,7 +379,12 @@ void Menu::back()
 void Menu::drawTitle(const Entry *entry)
 {
   if (entry)
-    this->drawTitle(entry->label.empty() ? "root" : entry->label.c_str(), entry->glyph);  
+  {
+    if (const std::string &label = entry->getLabel(); label.empty())
+      this->drawTitle("root", entry->getGlyph());  
+    else
+      this->drawTitle(label.c_str(), entry->getGlyph());  
+  }
 }
 
 void Menu::drawTitle(const char *label, uint16_t glyph)
@@ -476,14 +482,14 @@ void Menu::draw()
     for (int16_t entryIndex = std::max(0, entryCurrent - 3), entryEnd = std::min((uint8_t)this->current->entries.size() - 1, entryCurrent + 2) + 1; entryIndex < entryEnd; ++entryIndex)
     {
       int16_t locationEntry = (entryIndex * 42) - (int16_t)this->locationCurrent + (sprite.width() / 2) - 21;
-      // Serial.printf("%c @ locationEntry=%d\n", this->current->entries[entryIndex]->glyph, locationEntry);
+      // Serial.printf("%c @ locationEntry=%d\n", this->current->entries[entryIndex]->getGlyph(), locationEntry);
 
       
       //this->u8g2.setFont(this->current->entries[entryIndex]->font);
       sprite.setCursor(locationEntry, 0);
       
-      sprite.drawGlyph(this->current->entries[entryIndex]->glyph);
-      //this->u8g2.drawGlyph(64 + locationEntry, 0, this->current->entries[entryIndex]->glyph);    
+      sprite.drawGlyph(this->current->entries[entryIndex]->getGlyph());
+      //this->u8g2.drawGlyph(64 + locationEntry, 0, this->current->entries[entryIndex]->getGlyph());    
 
       if (entryIndex == this->index)
       {
@@ -502,7 +508,7 @@ void Menu::draw()
     // Serial.printf("this->locationCurrent=%d, expected=%d (index=%u)\n", this->locationCurrent, ((int16_t)this->index * 42), this->index);
     if (dist < 8)
     {
-        const char *label = this->current->entries[this->index]->label.c_str();
+        const char *label = this->current->entries[this->index]->getLabel().c_str();
         // tft.loadFont(GrundschriftRegular20);
         // // tft.setTextColor(TFT_BLACK);
         // uint8_t color = (30 * dist);
@@ -532,11 +538,11 @@ void Menu::draw()
 //    this->u8g2.drawBox(0, 0, 128, 10);
 //    this->u8g2.setDrawColor(0);
 //    this->u8g2.setFont(u8g2_font_5x7_tf);
-//    const char *label = menu->label.c_str();
+//    const char *label = menu->getLabel().c_str();
 //    int strWidth = this->u8g2.getStrWidth(label);
 //    this->u8g2.drawUTF8(64 - ((strWidth + 16)/ 2) + 16, 9, label);
 //    this->u8g2.setFont(u8g2_font_open_iconic_all_1x_t);
-//    this->u8g2.drawGlyph(64 - ((strWidth + 16)/ 2), 9, menu->glyph);
+//    this->u8g2.drawGlyph(64 - ((strWidth + 16)/ 2), 9, menu->getGlyph());
 //    this->u8g2.setDrawColor(1);
 //    
 //    // frame & clip...
@@ -553,15 +559,15 @@ void Menu::draw()
 
       if (Value *value = static_cast<Value*>(this->current->entries[entryIndex]))
       {
-        this->u8g2.drawUTF8(14, 12 + 25 + locationEntry, value->label.c_str());    
+        this->u8g2.drawUTF8(14, 12 + 25 + locationEntry, value->getLabel().c_str());    
         this->u8g2.drawGlyph(56, 12 + 25 + locationEntry, ':');
         this->u8g2.setFont(value->getValueFont());
         this->u8g2.drawUTF8(64, 12 + 25 + locationEntry, value->getValue(this, value));    
         if (entryIndex == this->index)
         {
           this->u8g2.setFont(u8g2_font_open_iconic_all_1x_t);
-          // Serial.printf("%s: glyph=%d\n", __PRETTY_FUNCTION__, value->glyph);
-          this->u8g2.drawGlyph(3, 12 + 25 + locationEntry, value->glyph != 0 ? value->glyph : (uint16_t)78);
+          // Serial.printf("%s: glyph=%d\n", __PRETTY_FUNCTION__, value->getGlyph());
+          this->u8g2.drawGlyph(3, 12 + 25 + locationEntry, value->getGlyph() != 0 ? value->getGlyph() : (uint16_t)78);
           this->u8g2.setFont(u8g2_font_6x12_tf);  
           const char *val = value->getValue(this, value);
           int strWidth = this->u8g2.getStrWidth(val);

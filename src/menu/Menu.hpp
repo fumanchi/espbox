@@ -52,7 +52,7 @@ public:
   struct SubMenu;
   
   struct Entry
-  {   
+  {
     enum class Type
     {
       Leaf,
@@ -61,47 +61,77 @@ public:
       Root  
     };
     
-    Entry(Type type, uint16_t glyph, std::string label, callback_t callback);
-    Entry(const Entry &other) = delete;
+    Entry() = default;
     virtual ~Entry() = default;
 
+    virtual Type getType() const = 0;
+    virtual uint16_t getGlyph() const = 0;
+    virtual const std::string &getLabel() const = 0;
+
+    virtual SubMenu *getParent() const = 0;
+    virtual void setParent(SubMenu *parent) = 0;
+
+    inline virtual bool hasCallback() const { return this->getCallback() != nullptr; }
+    virtual callback_t getCallback() const = 0;
+    inline virtual void call(Menu *menu) { if (this->hasCallback()) this->getCallback()(menu, this); };
+
     virtual bool isSubMenu() = 0;
-    
+
+  };
+
+  struct EntryImpl : Entry
+  {       
+    EntryImpl(Type type, uint16_t glyph, std::string label, callback_t callback, SubMenu *parent = nullptr);
+    EntryImpl(const EntryImpl &other) = delete;
+    virtual ~EntryImpl() = default;
+
+    inline virtual Type getType() const override { return this->type; }
+    inline virtual uint16_t getGlyph() const override { return this->glyph; }
+    inline virtual const std::string &getLabel() const override { return this->label; }
+
+    inline virtual SubMenu *getParent() const override { return this->parent; }
+    inline virtual void setParent(SubMenu *parent) override { this->parent = parent; }
+
+    inline virtual bool hasCallback() const override { return this->callback != nullptr; }
+    inline virtual callback_t getCallback() const override { return this->callback; }
+    inline virtual void call(Menu *menu) { if (this->callback) this->callback(menu, this); };
+
     SubMenu *parent;
 
     const Type type;
-      uint16_t glyph;
-      std::string label;
-      callback_t callback; 
-    };
+    uint16_t glyph;
+    std::string label;
 
-    struct Leaf : Entry
-    {
-      Leaf(uint16_t glyph, std::string label, callback_t callback = nullptr);
-      Leaf(const Leaf &other) = delete;
-      virtual ~Leaf() = default;
+    callback_t callback; 
+  };
 
-      virtual bool isSubMenu();
-    };
+  struct Leaf : EntryImpl
+  {
+    Leaf(uint16_t glyph, std::string label, callback_t callback = nullptr, SubMenu *parent = nullptr);
+    Leaf(const Leaf &other) = delete;
+    virtual ~Leaf() = default;
 
-    struct Toggle : Leaf
-    {
-      typedef std::pair<uint16_t, std::string> StateEntry;
+    virtual bool isSubMenu();
+  };
 
-      Toggle(StateEntry stateEntryEnabled, StateEntry stateEntryDisabled, bool state);
-      Toggle(StateEntry stateEntryEnabled, StateEntry stateEntryDisabled, callback_t callback = nullptr, bool state = true);
-      Toggle(const Toggle &other) = delete;
-      virtual ~Toggle() = default;
+  struct Toggle : Leaf
+  {
+    typedef std::pair<uint16_t, std::string> StateEntry;
 
-      void toggle();
-      void setState(bool state);
-      bool getState() const;
+    Toggle(StateEntry stateEntryEnabled, StateEntry stateEntryDisabled, bool state);
+    Toggle(StateEntry stateEntryEnabled, StateEntry stateEntryDisabled, callback_t callback = nullptr, bool state = true);
+    Toggle(const Toggle &other) = delete;
+    virtual ~Toggle() = default;
 
-      StateEntry stateEntries[2];
-      callback_t callback;
+    void toggle();
+    void setState(bool state);
+    bool getState() const;
 
-      bool state;
-    };
+    StateEntry stateEntries[2];
+    callback_t callback;
+
+    bool state;
+  };
 
   template<int NSTATES>
   struct Triggle : Leaf
@@ -160,7 +190,7 @@ public:
     int state;
   };
 
-  struct Value : Entry
+  struct Value : EntryImpl
   {
     Value(std::string label, callback_t callback = nullptr);
     Value(uint16_t glyph, std::string label, callback_t callback = nullptr);
@@ -303,7 +333,7 @@ public:
   };
 
   
-  struct SubMenu : Entry
+  struct SubMenu : EntryImpl
   {
     typedef bool(*ExitCallback)(Menu*);
     

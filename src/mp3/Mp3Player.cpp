@@ -52,7 +52,8 @@ Mp3Player::State::FlagReference &Mp3Player::State::FlagReference::operator=(bool
 Mp3Player::State::State()
   : folder {0},
     track {0},
-    flags {0}
+    flags {0},
+    playing {false}
 {
   
 }
@@ -60,7 +61,8 @@ Mp3Player::State::State()
 Mp3Player::State::State(uint16_t folder, uint16_t track, std::initializer_list<Flag> flagsGiven)
   : folder {folder},
     track {track},
-    flags {0}
+    flags {0},
+    playing {false}
 {
   for (uint8_t flagGiven : flagsGiven) 
     this->flags |= (1u << flagGiven);
@@ -78,6 +80,7 @@ Mp3Player::State &Mp3Player::State::operator=(const State &other)
     this->folder = other.folder;
     this->track = other.track;
     this->flags = other.flags;
+    this->playing = other.playing;
     return *this;
 }
 
@@ -115,6 +118,28 @@ uint16_t Mp3Player::State::getTrack() const
 {
     return this->track;
 }
+
+bool Mp3Player::State::isPlaying() const
+{
+    return this->playing;
+}
+
+bool Mp3Player::State::startPlaying()
+{
+  bool retval = false;
+  if ((retval = !this->playing))
+    this->playing = true;
+  return retval;
+}
+
+bool Mp3Player::State::stopPlaying()
+{
+  bool retval = false;
+  if ((retval = this->playing))
+    this->playing = false;
+  return retval;
+}
+
 
 Mp3Player::Mp3Player()
     : DfMp3{Serial1},
@@ -316,6 +341,33 @@ bool Mp3Player::waitUntilBusy(size_t timeout)
   return this->busy;
 }
 
+void Mp3Player::start()
+{
+  if (!this->currentState.isPlaying())
+  {
+    this->currentState.startPlaying();
+    this->DfMp3::start();
+  }
+}
+
+void Mp3Player::stop()
+{
+  if (this->currentState.isPlaying())
+  {
+    this->currentState.stopPlaying();
+    this->DfMp3::stop();
+  }
+}
+
+void Mp3Player::pause()
+{
+  if (this->currentState.isPlaying())
+  {
+    this->currentState.stopPlaying();
+    this->DfMp3::pause();
+  }
+}
+
 void Mp3Player::runState(const State &state)
 {
   Serial.printf("%s@%d: this->currentTrackIndex=%u\n", __PRETTY_FUNCTION__, __LINE__, this->currentTrackIndex);
@@ -345,7 +397,10 @@ void Mp3Player::runState(const State &state)
       if (this->currentState[State::RANDOM])
         this->playRandomTrackFromAll();
       else
+      {
+        this->currentState.startPlaying();
         this->playGlobalTrack(1);
+      }
       break;
     case Mode::SingleFolder:
       if (this->currentState[State::RANDOM])
@@ -373,6 +428,7 @@ void Mp3Player::playRandomTrackFromAll()
   assert(this->currentTrackIndex == 0);
   this->currentTrackIndex = 0;
 
+  this->currentState.startPlaying();
   this->playNextRandomTrackFromAll();
   // if (this->getTotalTrackCount())
   // {
@@ -391,6 +447,10 @@ void Mp3Player::playNextRandomTrackFromAll()
     this->DfMp3::playGlobalTrack((fnv1a_16(this->currentTrackIndex + this->randomSeed) % this->getTotalTrackCount()) + 1);
     Serial.printf("%s: currentTrack=%u actual track=%u/%u\n", __PRETTY_FUNCTION__, this->currentTrackIndex, (fnv1a_16(this->currentTrackIndex + this->randomSeed) % this->getTotalTrackCount()) + 1, this->getTotalTrackCount());
   }
+  else
+  {
+    this->currentState.stopPlaying();
+  }
 }
 
 void Mp3Player::playRandomTrackFromFolder()
@@ -404,6 +464,7 @@ void Mp3Player::playRandomTrackFromFolder()
   assert(this->currentTrackIndex == 0);
   this->currentTrackIndex = 0;
 
+  this->currentState.startPlaying();
   this->playNextRandomTrackFromFolder();
   // if (this->getFolderTrackCount())
   // {
@@ -423,6 +484,10 @@ void Mp3Player::playNextRandomTrackFromFolder()
     Serial.printf("%s: currentTrack=%u actual track=%u/%u\n", __PRETTY_FUNCTION__, this->currentTrackIndex, (fnv1a_16(this->currentTrackIndex + this->randomSeed) % this->getFolderTrackCount()) + 1, this->getFolderTrackCount());
     this->DfMp3::playFolderTrack(this->currentState.getFolder(), (fnv1a_16(this->currentTrackIndex + this->randomSeed) % this->getFolderTrackCount()) + 1);
   }
+  else
+  {
+    this->currentState.stopPlaying();
+  }
 }
 
 void Mp3Player::playFolderTrack()
@@ -435,6 +500,7 @@ void Mp3Player::playFolderTrack()
   assert(this->currentTrackIndex == 0);
   this->currentTrackIndex = 0;
 
+  this->currentState.stopPlaying();
   this->playNextFolderTrack(); // add 1 & play
 }
 
@@ -445,10 +511,13 @@ void Mp3Player::playNextFolderTrack()
 
   if (this->currentTrackIndex)
     this->DfMp3::playFolderTrack(this->currentState.getFolder(), this->currentTrackIndex);
+  else
+    this->currentState.stopPlaying();
 }
 
 void Mp3Player::onError(uint16_t errorCode)
 {
+  this->currentState.stopPlaying();
 }
 
 void Mp3Player::onPlayFinished(PlaySources source, uint16_t track)
@@ -476,6 +545,8 @@ void Mp3Player::onPlayFinished(PlaySources source, uint16_t track)
         track = this->currentState[State::LOOP];
       if (track)
         this->playGlobalTrack(track);
+      else
+        this->currentState.stopPlaying();
     }
     break;
   case Mode::SingleFolder:
@@ -487,10 +558,14 @@ void Mp3Player::onPlayFinished(PlaySources source, uint16_t track)
   case Mode::SingleGlobalTrack:
     if (this->currentState[State::LOOP])
       playGlobalTrack(this->currentState.getTrack());
+    else
+      this->currentState.stopPlaying();
     break;
   case Mode::SingleFolderTrack:
     if (this->currentState[State::LOOP])
       playFolderTrack(this->currentState.getFolder(), this->currentState.getTrack());
+    else
+      this->currentState.stopPlaying();
     break;
   }
 }
